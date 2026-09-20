@@ -1,5 +1,7 @@
 package org;
 
+import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class TemperatureConverterTest {
@@ -29,4 +31,11 @@ class TemperatureConverterTest {
         assertFalse(converter.isExtremeTemperature(50));
     }
 
+    @Test
+    void kelvinToCelsius() {
+        TemperatureConverter converter = new TemperatureConverter();
+        assertEquals(0, converter.kelvinToCelsius(273.15), 0.01);
+        assertEquals(-273.15, converter.kelvinToCelsius(0), 0.01);
+        assertEquals(100, converter.kelvinToCelsius(373.15), 0.01);
+    }
 }
