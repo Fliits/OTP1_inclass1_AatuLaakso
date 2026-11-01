@@ -13,6 +13,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>25.0.1</javafx.version>
+        <jacoco.version>0.8.15</jacoco.version>
     </properties>
     <dependencies>
 
@@ -47,35 +48,33 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>org.jacoco</groupId>
-            <artifactId>org.jacoco.report</artifactId>
-            <version>0.8.15</version>
-        </dependency>
     </dependencies>
 
     <build>
         <finalName>tempcon</finalName>
         <plugins>
-            <!-- JaCoCo Plugin for Code Coverage -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.15</version>
+                <version>${jacoco.version}</version>
                 <executions>
-                    <!-- Attach JaCoCo agent -->
                     <execution>
+                        <id>prepare-agent</id>
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
-                    <!-- Generate coverage report -->
                     <execution>
                         <id>report</id>
-                        <phase>test</phase>
+                        <phase>verify</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>module-info.class</exclude>
+                            </excludes>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

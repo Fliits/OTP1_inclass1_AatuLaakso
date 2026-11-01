@@ -101,41 +101,58 @@ public class TemperatureConverterApp extends Application {
     private void convert() {
         try {
             double input = Double.parseDouble(inputField.getText().trim());
-            double result;
-            String unit;
+            ConversionResult conversion = calculateConversion(
+                    conversionChoice.getSelectionModel().getSelectedIndex(), input, converter);
+            double result = conversion.value();
+            String unit = conversion.unit();
 
             switch (conversionChoice.getSelectionModel().getSelectedIndex()) {
-                case 0 -> {
-                    result = converter.fahrenheitToCelsius(input);
-                    unit = "°C";
-                    conversionRepository.saveFahrenheitToCelsius(input, result, selectedLanguageCode());
-                }
-                case 1 -> {
-                    result = converter.celsiusToFahrenheit(input);
-                    unit = "°F";
-                    conversionRepository.saveCelsiusToFahrenheit(input, result, selectedLanguageCode());
-                }
-                case 2 -> {
-                    result = converter.kelvinToCelsius(input);
-                    unit = "°C";
-                    conversionRepository.saveKelvinToCelsius(input, result, selectedLanguageCode());
-                }
+                case 0 -> conversionRepository.saveFahrenheitToCelsius(
+                        input, result, selectedLanguageCode());
+                case 1 -> conversionRepository.saveCelsiusToFahrenheit(
+                        input, result, selectedLanguageCode());
+                case 2 -> conversionRepository.saveKelvinToCelsius(
+                        input, result, selectedLanguageCode());
                 default -> throw new IllegalStateException("No conversion selected");
             }
 
-            resultLabel.setText(String.format(Locale.ROOT, "%s %.2f %s",
-                    messages.getString("result"), result, unit));
-            double celsius = unit.equals("°C")
-                    ? result
-                    : converter.fahrenheitToCelsius(result);
-            statusLabel.setText(converter.isExtremeTemperature(celsius)
-                    ? messages.getString("extreme_warning")
-                    : "");
+            resultLabel.setText(formatResult(messages.getString("result"), result, unit));
+            statusLabel.setText(extremeStatus(messages, result, unit, converter));
         } catch (NumberFormatException exception) {
             showInputError();
         } catch (SQLException exception) {
             showDatabaseError(exception);
         }
+    }
+
+    static ConversionResult calculateConversion(int conversionIndex, double input,
+                                                TemperatureConverter converter) {
+        return switch (conversionIndex) {
+            case 0 -> new ConversionResult(converter.fahrenheitToCelsius(input), "°C");
+            case 1 -> new ConversionResult(converter.celsiusToFahrenheit(input), "°F");
+            case 2 -> new ConversionResult(converter.kelvinToCelsius(input), "°C");
+            default -> throw new IllegalArgumentException("Unknown conversion index: "
+                    + conversionIndex);
+        };
+    }
+
+    static String formatResult(String resultText, double value, String unit) {
+        return String.format(Locale.ROOT, "%s %.2f %s", resultText, value, unit);
+    }
+
+    static String extremeStatus(ResourceBundle messages, double result, String unit,
+                                TemperatureConverter converter) {
+        double celsius = celsiusValue(result, unit, converter);
+        return converter.isExtremeTemperature(celsius)
+                ? messages.getString("extreme_warning")
+                : "";
+    }
+
+    static double celsiusValue(double result, String unit, TemperatureConverter converter) {
+        return unit.equals("°C") ? result : converter.fahrenheitToCelsius(result);
+    }
+
+    record ConversionResult(double value, String unit) {
     }
 
     static Locale localeForLanguageIndex(int languageIndex) {
@@ -165,7 +182,11 @@ public class TemperatureConverterApp extends Application {
     }
 
     String selectedLanguageCode() {
-        return languageCodeForIndex(languageChoice.getSelectionModel().getSelectedIndex());
+        return selectedLanguageCode(languageChoice.getSelectionModel().getSelectedIndex());
+    }
+
+    static String selectedLanguageCode(int languageIndex) {
+        return languageCodeForIndex(languageIndex);
     }
 
     private void showInputError() {
