@@ -8,6 +8,7 @@ This project is a small Java library for converting temperatures and identifying
 
 - Java 25
 - Apache Maven
+- JavaFX 25.0.1 for the graphical user interface
 - JUnit Jupiter 5.14.0 for automated tests
 - JaCoCo 0.8.15 for code coverage
 - Jenkins for continuous integration
@@ -34,6 +35,21 @@ Run the test suite with Maven:
 ```bash
 mvn test
 ```
+
+Start the JavaFX application with:
+
+```bash
+mvn javafx:run
+```
+
+Use the Maven command above (or configure IntelliJ to use the Maven
+`javafx:run` goal). It supplies the JavaFX modules and Windows runtime
+components automatically; running `TemperatureConverterApp` with a plain
+`java` classpath does not.
+
+The GUI supports Fahrenheit-to-Celsius, Celsius-to-Fahrenheit, and Kelvin-to-Celsius
+conversions. It also reports when the converted Celsius value is outside the
+`-40 °C` to `50 °C` non-extreme range.
 
 JaCoCo is configured to collect execution data during testing and generate a coverage report. A full build can be used in the Jenkins pipeline with `mvn clean install`, followed by `mvn jacoco:report` when a standalone coverage report is required.
 
