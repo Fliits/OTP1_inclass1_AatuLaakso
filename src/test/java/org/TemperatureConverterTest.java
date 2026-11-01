@@ -5,6 +5,10 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,7 +38,8 @@ class TemperatureConverterTest {
             "extreme_warning",
             "invalid_temperature",
             "invalid_temperature_header",
-            "invalid_temperature_content"
+            "invalid_temperature_content",
+            "database_save_error"
     );
 
     @Test
@@ -98,5 +103,60 @@ class TemperatureConverterTest {
                 "Messages_bundle", Locale.forLanguageTag("sv-SE")).getLocale().getLanguage());
         assertEquals("ar", ResourceBundle.getBundle(
                 "Messages_bundle", Locale.forLanguageTag("ar-SA")).getLocale().getLanguage());
+    }
+
+    @Test
+    void savesEachConversionToItsMatchingTable() throws Exception {
+        assertConversionSaved(
+                (repository, language) -> repository.saveFahrenheitToCelsius(32, 0, language),
+                "fahrenheit_to_celsius", 32, 0, "ja");
+        assertConversionSaved(
+                (repository, language) -> repository.saveCelsiusToFahrenheit(100, 212, language),
+                "celsius_to_fahrenheit", 100, 212, "ko");
+        assertConversionSaved(
+                (repository, language) -> repository.saveKelvinToCelsius(273.15, 0, language),
+                "kelvin_to_celsius", 273.15, 0, "ar");
+    }
+
+    private void assertConversionSaved(ConversionAction action, String table,
+                                       double input, double result, String language)
+            throws Exception {
+        List<Object> parameters = new ArrayList<>();
+        List<String> sql = new ArrayList<>();
+        PreparedStatement statement = (PreparedStatement) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{PreparedStatement.class},
+                (proxy, method, args) -> {
+                    switch (method.getName()) {
+                        case "setDouble" -> parameters.add(args[1]);
+                        case "setString" -> parameters.add(args[1]);
+                        case "executeUpdate" -> {
+                            return 1;
+                        }
+                        default -> {
+                        }
+                    }
+                    return null;
+                });
+        Connection connection = (Connection) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{Connection.class},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("prepareStatement")) {
+                        sql.add((String) args[0]);
+                        return statement;
+                    }
+                    return null;
+                });
+
+        action.run(new ConversionRepository(() -> connection), language);
+
+        assertTrue(sql.getFirst().contains("INSERT INTO " + table));
+        assertEquals(List.of(input, result, language), parameters);
+    }
+
+    @FunctionalInterface
+    private interface ConversionAction {
+        void run(ConversionRepository repository, String language) throws Exception;
     }
 }

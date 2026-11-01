@@ -7,17 +7,20 @@ import java.sql.SQLException;
 
 public class ConversionRepository {
 
-    private final String url;
-    private final String username;
-    private final String password;
+    private final ConnectionProvider connectionProvider;
 
     public ConversionRepository() {
         String host = environment("DB_HOST", "localhost");
         String port = environment("DB_PORT", "3306");
         String database = environment("DB_NAME", "temperature_converter");
-        url = "jdbc:mariadb://" + host + ":" + port + "/" + database;
-        username = environment("DB_USER", "root");
-        password = environment("DB_PASSWORD", "");
+        String url = "jdbc:mariadb://" + host + ":" + port + "/" + database;
+        String username = environment("DB_USER", "root");
+        String password = environment("DB_PASSWORD", "");
+        connectionProvider = () -> DriverManager.getConnection(url, username, password);
+    }
+
+    ConversionRepository(ConnectionProvider connectionProvider) {
+        this.connectionProvider = connectionProvider;
     }
 
     public void saveFahrenheitToCelsius(double fahrenheit, double celsius, String languageCode)
@@ -43,13 +46,18 @@ public class ConversionRepository {
 
     private void save(String sql, double input, double result, String languageCode)
             throws SQLException {
-        try (Connection connection = DriverManager.getConnection(url, username, password);
+        try (Connection connection = connectionProvider.open();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setDouble(1, input);
             statement.setDouble(2, result);
             statement.setString(3, languageCode);
             statement.executeUpdate();
         }
+    }
+
+    @FunctionalInterface
+    interface ConnectionProvider {
+        Connection open() throws SQLException;
     }
 
     private static String environment(String name, String defaultValue) {
