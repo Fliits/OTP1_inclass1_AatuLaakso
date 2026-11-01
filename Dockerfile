@@ -6,7 +6,7 @@ RUN apt-get update \
         libxtst6 \
         libx11-xcb1 \
         libgl1 \
-        xvfb \
+        fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -22,5 +22,6 @@ ENV DB_PORT=3306
 ENV DB_NAME=temperature_converter
 ENV DB_USER=root
 ENV DB_PASSWORD=
+ENV DISPLAY=host.docker.internal:0.0
 
-ENTRYPOINT ["xvfb-run", "--auto-servernum", "--server-args=-screen 0 1280x800x24", "mvn", "-q", "javafx:run"]
+ENTRYPOINT ["mvn", "-q", "javafx:run"]

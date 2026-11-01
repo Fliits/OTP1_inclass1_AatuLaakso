@@ -29,5 +29,5 @@ spec:
 # 2. minikube image build -t fliits/svg_3012_2026:latest .
 # 3. kubectl apply -f tc.yaml
 #
-# JavaFX requires an X server. On Windows, start an X server and allow
-# connections from the Minikube VM before deploying this manifest.
+# JavaFX requires Xming. Start Xming on Windows with access control disabled
+# (for example, with the -ac option) before deploying this manifest.

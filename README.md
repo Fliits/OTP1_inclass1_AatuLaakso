@@ -83,5 +83,7 @@ docker build -t fliits/svg_3012_2026:latest .
 docker run --rm -e DISPLAY=host.docker.internal:0.0 fliits/svg_3012_2026:latest
 ```
 
-The container includes the JavaFX native runtime libraries. A running X server
-is still required for displaying the GUI.
+The container includes the JavaFX native runtime libraries. Start Xming on
+Windows before running the container and allow X11 connections, for example
+by starting it with `Xming.exe :0 -multiwindow -clipboard -ac`. The
+`DISPLAY=host.docker.internal:0.0` setting connects the container to Xming.
