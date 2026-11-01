@@ -1,0 +1,35 @@
+---
+# Temperature Converter JavaFX application deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temperature-converter
+  labels:
+    app: temperature-converter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temperature-converter
+  template:
+    metadata:
+      labels:
+        app: temperature-converter
+    spec:
+      containers:
+        - name: temperature-converter
+          image: fliits/svg_3012_2026:latest
+          imagePullPolicy: IfNotPresent
+          command: ["mvn"]
+          args: ["javafx:run"]
+          env:
+            - name: DISPLAY
+              value: "host.minikube.internal:0.0"
+
+# Run with Minikube:
+# 1. minikube start --driver=docker
+# 2. minikube image build -t fliits/svg_3012_2026:latest .
+# 3. kubectl apply -f tc.yaml
+#
+# JavaFX requires an X server. On Windows, start an X server and allow
+# connections from the Minikube VM before deploying this manifest.

@@ -16,10 +16,12 @@ import javafx.stage.Stage;
 
 import java.util.Locale;
 import java.util.ResourceBundle;
+import java.sql.SQLException;
 
 public class TemperatureConverterApp extends Application {
 
     private final TemperatureConverter converter = new TemperatureConverter();
+    private final ConversionRepository conversionRepository = new ConversionRepository();
     private final TextField inputField = new TextField();
     private final ComboBox<String> conversionChoice = new ComboBox<>();
     private final ComboBox<String> languageChoice = new ComboBox<>();
@@ -112,14 +114,17 @@ public class TemperatureConverterApp extends Application {
                 case 0 -> {
                     result = converter.fahrenheitToCelsius(input);
                     unit = "°C";
+                    conversionRepository.saveFahrenheitToCelsius(input, result, selectedLanguageCode());
                 }
                 case 1 -> {
                     result = converter.celsiusToFahrenheit(input);
                     unit = "°F";
+                    conversionRepository.saveCelsiusToFahrenheit(input, result, selectedLanguageCode());
                 }
                 case 2 -> {
                     result = converter.kelvinToCelsius(input);
                     unit = "°C";
+                    conversionRepository.saveKelvinToCelsius(input, result, selectedLanguageCode());
                 }
                 default -> throw new IllegalStateException("No conversion selected");
             }
@@ -134,7 +139,20 @@ public class TemperatureConverterApp extends Application {
                     : "");
         } catch (NumberFormatException exception) {
             showInputError();
+        } catch (SQLException exception) {
+            showDatabaseError(exception);
         }
+    }
+
+    private String selectedLanguageCode() {
+        return switch (languageChoice.getSelectionModel().getSelectedIndex()) {
+            case 1 -> "fi";
+            case 2 -> "ja";
+            case 3 -> "ko";
+            case 4 -> "sv";
+            case 5 -> "ar";
+            default -> "en";
+        };
     }
 
     private void showInputError() {
@@ -142,6 +160,14 @@ public class TemperatureConverterApp extends Application {
         alert.setTitle(messages.getString("invalid_temperature"));
         alert.setHeaderText(messages.getString("invalid_temperature_header"));
         alert.setContentText(messages.getString("invalid_temperature_content"));
+        alert.showAndWait();
+    }
+
+    private void showDatabaseError(SQLException exception) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(messages.getString("database_save_error"));
+        alert.setHeaderText(messages.getString("database_save_error"));
+        alert.setContentText(exception.getMessage());
         alert.showAndWait();
     }
 

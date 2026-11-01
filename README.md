@@ -51,6 +51,11 @@ The GUI supports Fahrenheit-to-Celsius, Celsius-to-Fahrenheit, and Kelvin-to-Cel
 conversions. It also reports when the converted Celsius value is outside the
 `-40 °C` to `50 °C` non-extreme range.
 
+Each successful conversion is saved to MariaDB in the matching conversion table
+from `init.sql`. The connection uses `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`,
+and `DB_PASSWORD` environment variables. Defaults are `localhost`, `3306`,
+`temperature_converter`, `root`, and an empty password.
+
 JaCoCo is configured to collect execution data during testing and generate a coverage report. A full build can be used in the Jenkins pipeline with `mvn clean install`, followed by `mvn jacoco:report` when a standalone coverage report is required.
 
 ## 5. Set-up and How To Run
