@@ -1,4 +1,115 @@
 ---
+# MariaDB credentials for the conversion history database.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: temperature-converter-db
+type: Opaque
+stringData:
+  root-password: "Test12"
+
+---
+# Database schema loaded on first MariaDB startup.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temperature-converter-db-init
+data:
+  init.sql: |
+    USE temperature_converter;
+    CREATE TABLE IF NOT EXISTS language (
+      code CHAR(2) PRIMARY KEY,
+      name VARCHAR(40) NOT NULL
+    );
+    INSERT IGNORE INTO language (code, name) VALUES
+      ('en', 'English'), ('fi', 'Finnish'), ('ja', 'Japanese'),
+      ('ko', 'Korean'), ('sv', 'Swedish'), ('ar', 'Arabic');
+    CREATE TABLE IF NOT EXISTS fahrenheit_to_celsius (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      fahrenheit DECIMAL(10,4) NOT NULL,
+      celsius DECIMAL(10,4) NOT NULL,
+      language_code CHAR(2) NOT NULL DEFAULT 'en',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (language_code) REFERENCES language(code)
+    );
+    CREATE TABLE IF NOT EXISTS celsius_to_fahrenheit (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      celsius DECIMAL(10,4) NOT NULL,
+      fahrenheit DECIMAL(10,4) NOT NULL,
+      language_code CHAR(2) NOT NULL DEFAULT 'en',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (language_code) REFERENCES language(code)
+    );
+    CREATE TABLE IF NOT EXISTS kelvin_to_celsius (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      kelvin DECIMAL(10,4) NOT NULL,
+      celsius DECIMAL(10,4) NOT NULL,
+      language_code CHAR(2) NOT NULL DEFAULT 'en',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (language_code) REFERENCES language(code)
+    );
+
+---
+# MariaDB service used by the application at DB_HOST=mariadb.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+spec:
+  selector:
+    app: temperature-converter-db
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temperature-converter-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temperature-converter-db
+  template:
+    metadata:
+      labels:
+        app: temperature-converter-db
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:11.4
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: temperature-converter-db
+                  key: root-password
+            - name: MARIADB_DATABASE
+              value: temperature_converter
+          volumeMounts:
+            - name: database-init
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mariadb-admin ping -h 127.0.0.1 -uroot -p"$MARIADB_ROOT_PASSWORD"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+      volumes:
+        - name: database-init
+          configMap:
+            name: temperature-converter-db-init
+
+---
 # Temperature Converter JavaFX application deployment.
 apiVersion: apps/v1
 kind: Deployment
@@ -16,11 +127,31 @@ spec:
       labels:
         app: temperature-converter
     spec:
+      initContainers:
+        - name: wait-for-mariadb
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z mariadb 3306; do echo "Waiting for MariaDB"; sleep 2; done
       containers:
         - name: temperature-converter
           image: fliits/svg_3012_2026:latest
           imagePullPolicy: IfNotPresent
           env:
+            - name: DB_HOST
+              value: "mariadb"
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              value: "temperature_converter"
+            - name: DB_USER
+              value: "root"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: temperature-converter-db
+                  key: root-password
             - name: DISPLAY
               value: "host.minikube.internal:0.0"
 

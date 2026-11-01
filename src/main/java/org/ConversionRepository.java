@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Duration;
 
 public class ConversionRepository {
 
@@ -13,7 +14,8 @@ public class ConversionRepository {
         String host = environment("DB_HOST", "localhost");
         String port = environment("DB_PORT", "3306");
         String database = environment("DB_NAME", "temperature_converter");
-        String url = "jdbc:mariadb://" + host + ":" + port + "/" + database;
+        String url = "jdbc:mariadb://" + host + ":" + port + "/" + database
+                + "?sslMode=disable&useServerPrepStmts=true";
         String username = environment("DB_USER", "root");
         String password = environment("DB_PASSWORD", "");
         connectionProvider = () -> DriverManager.getConnection(url, username, password);
@@ -46,13 +48,29 @@ public class ConversionRepository {
 
     private void save(String sql, double input, double result, String languageCode)
             throws SQLException {
-        try (Connection connection = connectionProvider.open();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setDouble(1, input);
-            statement.setDouble(2, result);
-            statement.setString(3, languageCode);
-            statement.executeUpdate();
+        SQLException lastFailure = null;
+        for (int attempt = 1; attempt <= 10; attempt++) {
+            try (Connection connection = connectionProvider.open();
+                 PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setDouble(1, input);
+                statement.setDouble(2, result);
+                statement.setString(3, languageCode);
+                statement.executeUpdate();
+                return;
+            } catch (SQLException exception) {
+                lastFailure = exception;
+                if (attempt < 10) {
+                    try {
+                        Thread.sleep(Duration.ofSeconds(2));
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        throw new SQLException("Database connection retry was interrupted",
+                                interruptedException);
+                    }
+                }
+            }
         }
+        throw lastFailure;
     }
 
     @FunctionalInterface
