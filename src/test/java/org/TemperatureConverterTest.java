@@ -8,7 +8,13 @@ import java.util.ResourceBundle;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -76,6 +82,18 @@ class TemperatureConverterTest {
     }
 
     @Test
+    void commandLineMainConvertsFahrenheitInput() {
+        String output = runCommandLine("1\n32\n");
+        assertTrue(output.contains("0.0"));
+    }
+
+    @Test
+    void commandLineMainUsesTheSecondLanguageBranch() {
+        String output = runCommandLine("2\n212\n");
+        assertTrue(output.contains("100.0"));
+    }
+
+    @Test
     void localizedGuiMessagesExistForEverySupportedLanguage() {
         for (Locale locale : SUPPORTED_LOCALES) {
             ResourceBundle bundle = ResourceBundle.getBundle("Messages_bundle", locale);
@@ -118,6 +136,74 @@ class TemperatureConverterTest {
                 "kelvin_to_celsius", 273.15, 0, "ar");
     }
 
+    @Test
+    void retriesDatabaseConnectionAfterFailure() throws Exception {
+        int[] attempts = {0};
+        ConversionRepository repository = new ConversionRepository(
+                () -> {
+                    attempts[0]++;
+                    if (attempts[0] == 1) {
+                        throw new SQLException("database is starting");
+                    }
+                    return createConnection(new ArrayList<>(), new ArrayList<>());
+                },
+                2,
+                Duration.ZERO);
+
+        assertDoesNotThrow(() ->
+                repository.saveFahrenheitToCelsius(32, 0, "en"));
+        assertEquals(2, attempts[0]);
+    }
+
+    @Test
+    void reportsTheLastDatabaseFailureAfterRetries() {
+        SQLException failure = new SQLException("database unavailable");
+        ConversionRepository repository = new ConversionRepository(
+                () -> {
+                    throw failure;
+                },
+                3,
+                Duration.ZERO);
+
+        SQLException thrown = assertThrows(SQLException.class,
+                () -> repository.saveKelvinToCelsius(273.15, 0, "en"));
+        assertSame(failure, thrown);
+    }
+
+    @Test
+    void rejectsInvalidRetryConfiguration() {
+        assertAll(
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new ConversionRepository(() -> null, 0, Duration.ZERO)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new ConversionRepository(() -> null, 1, Duration.ofSeconds(-1)))
+        );
+    }
+
+    @Test
+    void defaultRepositoryCanBeConstructedFromEnvironmentDefaults() {
+        assertDoesNotThrow(() -> new ConversionRepository());
+    }
+
+    @Test
+    void interruptedRetryReportsAnSQLException() {
+        Thread.currentThread().interrupt();
+        try {
+            ConversionRepository repository = new ConversionRepository(
+                    () -> {
+                        throw new SQLException("database unavailable");
+                    },
+                    2,
+                    Duration.ofSeconds(2));
+
+            SQLException thrown = assertThrows(SQLException.class,
+                    () -> repository.saveFahrenheitToCelsius(32, 0, "en"));
+            assertTrue(thrown.getMessage().contains("retry was interrupted"));
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
     private void assertConversionSaved(ConversionAction action, String table,
                                        double input, double result, String language)
             throws Exception {
@@ -138,7 +224,27 @@ class TemperatureConverterTest {
                     }
                     return null;
                 });
-        Connection connection = (Connection) Proxy.newProxyInstance(
+        Connection connection = createConnection(sql, parameters, statement);
+
+        action.run(new ConversionRepository(() -> connection), language);
+
+        assertTrue(sql.getFirst().contains("INSERT INTO " + table));
+        assertEquals(List.of(input, result, language), parameters);
+    }
+
+    private Connection createConnection(List<String> sql, List<Object> parameters) {
+        return createConnection(sql, parameters, null);
+    }
+
+    private Connection createConnection(List<String> sql, List<Object> parameters,
+                                        PreparedStatement preparedStatement) {
+        PreparedStatement statement = preparedStatement == null
+                ? (PreparedStatement) Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{PreparedStatement.class},
+                (proxy, method, args) -> method.getName().equals("executeUpdate") ? 1 : null)
+                : preparedStatement;
+        return (Connection) Proxy.newProxyInstance(
                 getClass().getClassLoader(),
                 new Class<?>[]{Connection.class},
                 (proxy, method, args) -> {
@@ -148,11 +254,21 @@ class TemperatureConverterTest {
                     }
                     return null;
                 });
+    }
 
-        action.run(new ConversionRepository(() -> connection), language);
-
-        assertTrue(sql.getFirst().contains("INSERT INTO " + table));
-        assertEquals(List.of(input, result, language), parameters);
+    private String runCommandLine(String input) {
+        java.io.InputStream originalInput = System.in;
+        PrintStream originalOutput = System.out;
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try {
+            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
+            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            TemperatureConverter.main(new String[0]);
+            return output.toString(StandardCharsets.UTF_8);
+        } finally {
+            System.setIn(originalInput);
+            System.setOut(originalOutput);
+        }
     }
 
     @FunctionalInterface

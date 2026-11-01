@@ -8,7 +8,11 @@ import java.time.Duration;
 
 public class ConversionRepository {
 
+    private static final int DEFAULT_MAX_ATTEMPTS = 10;
+    private static final Duration DEFAULT_RETRY_DELAY = Duration.ofSeconds(2);
     private final ConnectionProvider connectionProvider;
+    private final int maxAttempts;
+    private final Duration retryDelay;
 
     public ConversionRepository() {
         String host = environment("DB_HOST", "localhost");
@@ -19,10 +23,25 @@ public class ConversionRepository {
         String username = environment("DB_USER", "root");
         String password = environment("DB_PASSWORD", "");
         connectionProvider = () -> DriverManager.getConnection(url, username, password);
+        maxAttempts = DEFAULT_MAX_ATTEMPTS;
+        retryDelay = DEFAULT_RETRY_DELAY;
     }
 
     ConversionRepository(ConnectionProvider connectionProvider) {
+        this(connectionProvider, DEFAULT_MAX_ATTEMPTS, DEFAULT_RETRY_DELAY);
+    }
+
+    ConversionRepository(ConnectionProvider connectionProvider, int maxAttempts,
+                         Duration retryDelay) {
+        if (maxAttempts < 1) {
+            throw new IllegalArgumentException("maxAttempts must be positive");
+        }
+        if (retryDelay.isNegative()) {
+            throw new IllegalArgumentException("retryDelay cannot be negative");
+        }
         this.connectionProvider = connectionProvider;
+        this.maxAttempts = maxAttempts;
+        this.retryDelay = retryDelay;
     }
 
     public void saveFahrenheitToCelsius(double fahrenheit, double celsius, String languageCode)
@@ -49,7 +68,7 @@ public class ConversionRepository {
     private void save(String sql, double input, double result, String languageCode)
             throws SQLException {
         SQLException lastFailure = null;
-        for (int attempt = 1; attempt <= 10; attempt++) {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try (Connection connection = connectionProvider.open();
                  PreparedStatement statement = connection.prepareStatement(sql)) {
                 statement.setDouble(1, input);
@@ -59,9 +78,9 @@ public class ConversionRepository {
                 return;
             } catch (SQLException exception) {
                 lastFailure = exception;
-                if (attempt < 10) {
+                if (attempt < maxAttempts) {
                     try {
-                        Thread.sleep(Duration.ofSeconds(2));
+                        Thread.sleep(retryDelay);
                     } catch (InterruptedException interruptedException) {
                         Thread.currentThread().interrupt();
                         throw new SQLException("Database connection retry was interrupted",

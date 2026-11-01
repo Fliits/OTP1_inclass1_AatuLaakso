@@ -75,16 +75,10 @@ public class TemperatureConverterApp extends Application {
     }
 
     private void updateLanguage(Stage stage) {
-        Locale locale = switch (languageChoice.getSelectionModel().getSelectedIndex()) {
-            case 1 -> Locale.forLanguageTag("fi-FI");
-            case 2 -> Locale.forLanguageTag("ja-JP");
-            case 3 -> Locale.forLanguageTag("ko-KR");
-            case 4 -> Locale.forLanguageTag("sv-SE");
-            case 5 -> Locale.forLanguageTag("ar-SA");
-            default -> new Locale("en", "EN");
-        };
+        Locale locale = localeForLanguageIndex(
+                languageChoice.getSelectionModel().getSelectedIndex());
         messages = ResourceBundle.getBundle("Messages_bundle", locale);
-        root.setNodeOrientation(locale.getLanguage().equals("ar")
+        root.setNodeOrientation(isRightToLeft(locale)
                 ? NodeOrientation.RIGHT_TO_LEFT
                 : NodeOrientation.LEFT_TO_RIGHT);
         stage.setTitle(messages.getString("app_title"));
@@ -144,8 +138,23 @@ public class TemperatureConverterApp extends Application {
         }
     }
 
-    private String selectedLanguageCode() {
-        return switch (languageChoice.getSelectionModel().getSelectedIndex()) {
+    static Locale localeForLanguageIndex(int languageIndex) {
+        return switch (languageIndex) {
+            case 1 -> Locale.forLanguageTag("fi-FI");
+            case 2 -> Locale.forLanguageTag("ja-JP");
+            case 3 -> Locale.forLanguageTag("ko-KR");
+            case 4 -> Locale.forLanguageTag("sv-SE");
+            case 5 -> Locale.forLanguageTag("ar-SA");
+            default -> new Locale("en", "EN");
+        };
+    }
+
+    static boolean isRightToLeft(Locale locale) {
+        return locale.getLanguage().equals("ar");
+    }
+
+    static String languageCodeForIndex(int languageIndex) {
+        return switch (languageIndex) {
             case 1 -> "fi";
             case 2 -> "ja";
             case 3 -> "ko";
@@ -153,6 +162,10 @@ public class TemperatureConverterApp extends Application {
             case 5 -> "ar";
             default -> "en";
         };
+    }
+
+    String selectedLanguageCode() {
+        return languageCodeForIndex(languageChoice.getSelectionModel().getSelectedIndex());
     }
 
     private void showInputError() {
