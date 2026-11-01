@@ -11,41 +11,47 @@ pipeline {
         DOCKERHUB_REPO = 'fliits/svg_3012_2026'
         DOCKER_IMAGE_TAG = 'latest'
     }
+    options {
+        timestamps()
+    }
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/Fliits/OTP1_inclass1_AatuLaakso'
+                checkout scm
             }
         }
         stage('Build') {
             steps {
-                bat 'mvn clean install' // sh for linux and ios
+                bat 'mvn -B clean package -DskipTests'
             }
         }
         stage('Test') {
             steps {
-                bat 'mvn test'
+                bat 'mvn -B test'
             }
         }
         stage('Code Coverage') {
             steps {
-                bat 'mvn jacoco:report'
+                bat 'mvn -B jacoco:report'
             }
         }
         stage('Publish Test Results') {
             steps {
-                junit '**/target/surefire-reports/*.xml'
+                junit testResults: '**/target/surefire-reports/*.xml',
+                      allowEmptyResults: false
             }
         }
         stage('Publish Coverage Report') {
             steps {
-                jacoco()
+                jacoco execPattern: '**/target/jacoco.exec',
+                       classPattern: '**/target/classes',
+                       sourcePattern: '**/src/main/java'
             }
         }
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${DOCKERHUB_REPO}:${DOCKER_IMAGE_TAG}")
+                    docker.build("${DOCKERHUB_REPO}:${DOCKER_IMAGE_TAG}", ".")
                 }
             }
         }

@@ -20,8 +20,6 @@ spec:
         - name: temperature-converter
           image: fliits/svg_3012_2026:latest
           imagePullPolicy: IfNotPresent
-          command: ["mvn"]
-          args: ["javafx:run"]
           env:
             - name: DISPLAY
               value: "host.minikube.internal:0.0"

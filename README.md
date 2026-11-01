@@ -75,3 +75,13 @@ double celsius = converter.fahrenheitToCelsius(32);
 double fahrenheit = converter.celsiusToFahrenheit(100);
 boolean extreme = converter.isExtremeTemperature(60);
 ```
+
+Build and run the JavaFX Docker image with:
+
+```bash
+docker build -t fliits/svg_3012_2026:latest .
+docker run --rm -e DISPLAY=host.docker.internal:0.0 fliits/svg_3012_2026:latest
+```
+
+The container includes the JavaFX native runtime libraries. A running X server
+is still required for displaying the GUI.
