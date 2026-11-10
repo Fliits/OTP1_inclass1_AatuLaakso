@@ -14,6 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>25.0.1</javafx.version>
         <jacoco.version>0.8.15</jacoco.version>
+        <sonar.projectKey>OTP1_inclass1_AatuLaakso</sonar.projectKey>
     </properties>
     <dependencies>
 
